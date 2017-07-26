@@ -1,0 +1,7 @@
+.idea
+*~
+*.orig
+*.pyc
+*.rej
+*.sqlite3
+logs/*

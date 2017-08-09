@@ -108,21 +108,24 @@ class BulkLoader(LoggingMixin):
         super(BulkLoader, self).__init__()
         self.set_logger(logger=logger)
 
-    def get_objects_from_url(self, url):
-        """Uses self.key to traverse json result"""
-        # todo add timeout to request
-        response = requests.get(url)
-        resp_result = json.loads(response.text)
-        if response.status_code == 200:
-            for ki in self.key.split('.'):
-                try:
-                    resp_result = resp_result.get(ki)
-                    result = resp_result
-                except (AttributeError, KeyError) as e:
-                    result = {}
-            return result
+    @staticmethod
+    def get_response(url):
+        response = requests.get(url, timeout=10)
+        if response.ok:
+            return response.json()
         else:
-            raise requests.HTTPError
+            response.raise_for_status()
+
+    def get_objects_from_url(self, data):
+        """Uses self.key to traverse json result"""
+        for ki in self.key.split('.'):
+            try:
+                data = data[ki]
+            except (AttributeError, KeyError) as e:
+                result = {}
+            else:
+                result = data
+        return result
 
     def get_values_queryset(self):
         return self.fetch_class.objects.filter(department_scraped=False).values_list('school_id', flat=True)
@@ -141,11 +144,12 @@ class BulkLoader(LoggingMixin):
         # todo use try except else instead of _error = True
         # todo move this to process_url method
         try:
-            objs = self.get_objects_from_url(url.url)
+            resp_data = self.get_response(url.url)
         except (KeyboardInterrupt, SystemExit):
             self.log('Going to halt now', level=logging.WARNING)
             # http://effbot.org/zone/stupid-exceptions-keyboardinterrupt.html
             raise
+        # maybe add division by requests exceptions (Timeout, HTTPError, ConnectionError)
         except requests.RequestException:
             # todo add handle_error method
             # todo check error reporting when disconnected
@@ -159,12 +163,14 @@ class BulkLoader(LoggingMixin):
             # print("Unexpected error:", sys.exc_info()[0])
             self._error = True
             objs = {}
+        else:
+            objs = self.get_objects_from_url(resp_data)
 
         # todo move to save_objs method after refactoring and decoupling
         for key in objs.keys():
             obj = objs[key]
             # todo think better name for url
-            obj.update({'source_url': url})
+            obj.update({'source_url': url.url})
             # add sleep here. Should wait with list population while updating db
             #  or maybe this is not a problem
             # Should i use queues instead of lists?
@@ -176,13 +182,14 @@ class BulkLoader(LoggingMixin):
             #  so I can remove success_ids list
             self.save_list.append(self.save_class(**obj))
             # add to success dict for bulk update via method final_update
-            if url.id_to_update:
-                self.success_ids.append(url.id_to_update)
+            # if url.id_to_update:
+            #     self.success_ids.append(url.id_to_update)
 
         # url without objects in result list should be marked as processed
-        if not objs and not self._error:
+        if not self._error:
             while self.work_with_db:
                 time.sleep(1)
+            # add to success dict for bulk update via method final_update
             if url.id_to_update:
                 self.success_ids.append(url.id_to_update)
 
@@ -245,6 +252,7 @@ class ThreadedBulkLoader(BulkLoader):
                 # todo make process url method to add processed url to another queue that will be consumed by single process or thread
                 self.process_url(item)
                 self.q.task_done()
+                # todo add acquire lock here
                 self.req_count += 1
 
         for i in range(self.concurrent):

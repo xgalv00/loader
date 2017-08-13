@@ -16,5 +16,5 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         logger = logging.getLogger('import')
-        PaginatedBulkLoader(logger=logger).process_urls()
+        # PaginatedBulkLoader(logger=logger).process_urls()
         ThreadedBulkLoader(logger=logger).process_urls()

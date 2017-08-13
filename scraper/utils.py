@@ -1,21 +1,14 @@
 import gc
 import logging
-import requests
 import time
 from queue import Queue
 from threading import Thread
 
+import requests
 from django.core.paginator import Paginator
 from django.db import transaction
 
 from scraper.models import School, Department
-
-
-API_URL = 'https://www.myedu.com/adms'
-SCHOOL_PATH = '/school/'
-DEPARTMENT_PATH = '/school/{}/department/'
-COURSE_PATH = '/department/{department_id}/course/'
-PROFESSOR_PATH = '/department/{department_id}/professor/'
 
 
 class LoggingMixin(object):
@@ -30,11 +23,15 @@ class LoggingMixin(object):
             # Logger was not provided. Continue without logging
             self._disable_logging = True
 
-    def log(self, msg, level=logging.INFO):
+    def log(self, msg, level=logging.INFO, exc_info=False):
         # todo get caller info (class, function, thread or process)
         # todo use self.stdout.write or print if logger is not available
         if self._logger and not self._disable_logging:
-            self._logger.log(level, msg)
+            self._logger.log(level, msg, exc_info=exc_info)
+
+# todo remove this after refactoring
+# placed here due to circular importing
+from scraper.datagetters import API_URL, SCHOOL_PATH, DEPARTMENT_PATH, Url
 
 
 class ProcessBigAmountsMixin(LoggingMixin):
@@ -115,7 +112,8 @@ class BulkLoader(LoggingMixin):
         for ki in self.key.split('.'):
             try:
                 data = data[ki]
-            except (AttributeError, KeyError) as e:
+            # TypeError for handling empty list in result
+            except (KeyError, TypeError) as e:
                 result = {}
             else:
                 result = data
@@ -128,7 +126,7 @@ class BulkLoader(LoggingMixin):
         values_queryset = self.get_values_queryset()
         for v in values_queryset:
             query_url = self.url_template.format(v)
-            # todo move this id propagation to a dict where url will be the key and propagated id on of the values
+            # todo move this id propagation to a dict where url will be the key and propagated id one of the values
             yield Url(query_url, id_to_update=v)
 
     def process_url(self, url):
@@ -218,15 +216,6 @@ class BulkLoader(LoggingMixin):
         self.work_with_db = False
 
 
-class Url(object):
-    """helper class used to store all necessary data about urls that should be processed"""
-    processed = False
-
-    def __init__(self, url, id_to_update=None):
-        self.url = url
-        self.id_to_update = id_to_update
-
-
 class ThreadedBulkLoader(BulkLoader):
     # todo add as argument to initialization of class
     concurrent = 5
@@ -308,7 +297,7 @@ class PaginatedBulkLoader(BulkLoader):
 
             self.process_url(url)
 
-            if self.req_count % self.save_count == 0:
+            if self.req_count > 0 and self.req_count % self.save_count == 0:
                 self.update_db()
                 self.log('Process request {}'.format(self.req_count))
 

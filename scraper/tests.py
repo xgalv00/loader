@@ -5,7 +5,8 @@ from django.test import TestCase, mock
 from model_mommy import mommy
 
 from scraper.models import School, Department
-from scraper.utils import BulkLoader, Url, PaginatedBulkLoader
+from scraper.utils import BulkLoader, PaginatedBulkLoader
+from scraper.datagetters import Url
 
 
 def mocked_requests_get(*args, **kwargs):

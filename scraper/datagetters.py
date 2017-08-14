@@ -61,6 +61,9 @@ class DataGetter(LoggingMixin):
 
     def fetch_url(self, url):
         try:
+            # todo move get_response to Url class
+            # todo think where to handle exceptions while requests.get
+            #  maybe define your own exception and raise it from this exceptions
             resp_data = self.get_response(url.url)
         # maybe add division by requests exceptions (Timeout, HTTPError, ConnectionError)
         except requests.RequestException as e:
@@ -76,7 +79,17 @@ class DataGetter(LoggingMixin):
 
         return url
 
+    def fetch_urls(self):
+        for url in self.get_urls():
+            yield self.fetch_url(url=url)
+            self.req_count += 1
 
+            if self.req_count == self.max_req_count:
+                self.log('Hit max request at {}'.format(self.req_count))
+                raise StopIteration
+
+
+# todo make Url class injectable
 class Url(LoggingMixin):
     """helper class used to store all necessary data about urls that should be processed"""
 

@@ -607,7 +607,28 @@ class DataSaverTest(TestCase):
 
 
 class ExecutorTest(TestCase):
-    pass
+
+    def setUp(self):
+        mommy.make(School, school_id=1)
+        mommy.make(School, school_id=2)
+        mommy.make(School, school_id=3)
+        self.ter = Executor()
+
+    def tearDown(self):
+        School.objects.all().delete()
+        Department.objects.all().delete()
+        del self.ter
+
+    @mock.patch('requests.get', side_effect=mocked_requests_get)
+    def test_execute(self, mocked_get):
+        self.assertFalse(School.objects.filter(department_scraped=True).exists())
+        self.assertEqual(Department.objects.count(), 0)
+        self.ter.execute()
+        self.assertEqual(School.objects.filter(department_scraped=False).count(), 1)
+        sc_error = School.objects.get(department_scraped=False)
+        self.assertEqual(sc_error.school_id, 3)
+        self.assertEqual(School.objects.filter(department_scraped=True).count(), 2)
+        self.assertEqual(Department.objects.count(), 4)
 
 
 class PaginatedBulkLoaderTest(TestCase):

@@ -17,16 +17,14 @@ class DataGetter(LoggingMixin):
     url_template = '{api_url}{obj_path}'.format(api_url=API_URL, obj_path=DEPARTMENT_PATH)
     # string for traversing json objects
     key = 'result.Department'
-    req_count = 0
-    max_req_count = 0
+
     # class to get_urls from get_values_queryset should be redefined
     # if None than get_urls should know how to get urls for processing
-    fetch_class = None
 
     # max_req_count max number of requests that should be emmited
-    def __init__(self, max_req_count=100):
+    def __init__(self, fetch_class=None):
         super().__init__()
-        self.max_req_count = max_req_count
+        self.fetch_class = fetch_class
 
     @staticmethod
     def get_response(url):
@@ -79,15 +77,6 @@ class DataGetter(LoggingMixin):
 
         return url
 
-    def fetch_urls(self):
-        for url in self.get_urls():
-            yield self.fetch_url(url=url)
-            self.req_count += 1
-
-            if self.req_count == self.max_req_count:
-                self.log('Hit max request at {}'.format(self.req_count))
-                raise StopIteration
-
 
 # todo make Url class injectable
 class Url(LoggingMixin):
@@ -115,4 +104,5 @@ class Url(LoggingMixin):
         last_tb_line = traceback.format_exc().splitlines()[-1]
         # exc_info could be set to True, but last tb line printing is enough for now
         self.log(msg='Url: {}, e_val: {}'.format(self.url, last_tb_line), level=logging.ERROR)
+        # used for id exclusion from success update
         self.error = True

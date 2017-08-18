@@ -1,4 +1,4 @@
-from scraper.datagetters import DataGetter
+from scraper.datagetters import DataGetter, PaginatedDataGetter
 from scraper.datasavers import DataSaver
 from scraper.utils import LoggingMixin
 from scraper.models import School, Department
@@ -34,3 +34,9 @@ class Executor(LoggingMixin):
         self.saver.update_db()
 
         self.log('Finish data loading. Requests issued {}. Errors {}'.format(self.req_count, self.error_count))
+
+
+# todo remove this class after switch to @classmethod usage
+class PaginatedExecutor(Executor):
+    getter = PaginatedDataGetter()
+    saver = DataSaver(save_count=100, save_class=School)

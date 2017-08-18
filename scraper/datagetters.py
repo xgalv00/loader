@@ -78,6 +78,37 @@ class DataGetter(LoggingMixin):
         return url
 
 
+class PaginatedDataGetter(DataGetter):
+    key = 'result.School'
+    url_template = '{api_url}{obj_path}'.format(api_url=API_URL, obj_path=SCHOOL_PATH)
+
+    def __init__(self, fetch_class=None):
+        super().__init__(fetch_class)
+        self.pages = 1
+
+    def is_paginated(self, url):
+        paged_url = '{url}{query}'.format(url=url, query='?page=1')
+        # todo add logging and error handling here
+        resp_result = self.get_response(paged_url)
+        try:
+            pag_dict = resp_result['pagination']
+        except KeyError:
+            return False
+        else:
+            self.pages = pag_dict['pages']
+            return True
+
+    def get_urls(self):
+        query_url = self.url_template
+        if self.is_paginated(query_url):
+            page = 1
+            while page <= self.pages:
+                yield Url('{url}?page={page}'.format(url=query_url, page=page))
+                page += 1
+        else:
+            yield Url(query_url)
+
+
 # todo make Url class injectable
 class Url(LoggingMixin):
     """helper class used to store all necessary data about urls that should be processed"""

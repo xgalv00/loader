@@ -6,9 +6,9 @@ from model_mommy import mommy
 
 from scraper.models import School, Department
 from scraper.utils import BulkLoader, PaginatedBulkLoader
-from scraper.datagetters import DataGetter
+from scraper.datagetters import DataGetter, PaginatedDataGetter
 from scraper.datasavers import DataSaver
-from scraper.executors import Executor
+from scraper.executors import Executor, PaginatedExecutor
 from scraper.datagetters import Url
 
 DEPARTMENT_RESPONSE_DICT = {
@@ -629,6 +629,47 @@ class ExecutorTest(TestCase):
         self.assertEqual(sc_error.school_id, 3)
         self.assertEqual(School.objects.filter(department_scraped=True).count(), 2)
         self.assertEqual(Department.objects.count(), 4)
+
+
+class PaginatedDataGetterTest(TestCase):
+    def setUp(self):
+        self.tdg = PaginatedDataGetter()
+
+    def tearDown(self):
+        School.objects.all().delete()
+        del self.tdg
+
+    @mock.patch('requests.get', side_effect=mocked_requests_get)
+    def test_paginated(self, mock_get):
+        paginated = 'https://www.myedu.com/adms/school/paginated'
+        self.assertEqual(self.tdg.pages, 1)
+        self.assertTrue(self.tdg.is_paginated(url=paginated))
+        self.assertEqual(self.tdg.pages, 2)
+
+    @mock.patch('requests.get', side_effect=mocked_requests_get)
+    def test_not_paginated(self, mock_get):
+        not_paginated = 'https://www.myedu.com/adms/school/notpaginated'
+        self.assertEqual(self.tdg.pages, 1)
+        self.assertFalse(self.tdg.is_paginated(url=not_paginated))
+        self.assertEqual(self.tdg.pages, 1)
+
+    def test_get_urls(self):
+        urls = list(self.tdg.get_urls())
+        self.assertEqual(len(urls), self.tdg.pages)
+        for url in urls:
+            self.assertIsInstance(url, Url)
+            self.assertIn('page', url.url)
+            self.assertRegex(url.url, 'https://www.myedu.com/adms/school/\?page=[\d+]')
+
+
+class PaginatedDataExecutorTest(TestCase):
+
+    @mock.patch('requests.get', side_effect=mocked_requests_get)
+    def test_process_urls(self, mock_get):
+        self.assertFalse(School.objects.exists())
+        PaginatedExecutor().execute()
+        self.assertTrue(School.objects.exists())
+        self.assertEqual(School.objects.count(), 10)
 
 
 class PaginatedBulkLoaderTest(TestCase):

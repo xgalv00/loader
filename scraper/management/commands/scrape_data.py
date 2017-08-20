@@ -2,7 +2,7 @@ import logging
 
 from django.core.management.base import BaseCommand
 
-from scraper.utils import PaginatedBulkLoader, ThreadedBulkLoader
+from scraper.executors import PaginatedExecutor, ThreadedExecutor
 
 
 class Command(BaseCommand):
@@ -16,5 +16,5 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         logger = logging.getLogger('import')
-        # PaginatedBulkLoader(logger=logger).process_urls()
-        ThreadedBulkLoader(logger=logger).process_urls()
+        PaginatedExecutor(logger=logger).execute()
+        ThreadedExecutor(logger=logger).execute()

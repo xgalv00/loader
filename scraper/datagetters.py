@@ -1,10 +1,8 @@
-import logging
 import sys
-import traceback
 
 import requests
 
-from scraper.utils import LoggingMixin
+from scraper.utils import LoggingMixin, Url
 
 API_URL = 'https://www.myedu.com/adms'
 SCHOOL_PATH = '/school/'
@@ -107,33 +105,3 @@ class PaginatedDataGetter(DataGetter):
                 page += 1
         else:
             yield Url(query_url)
-
-
-# todo make Url class injectable
-class Url(LoggingMixin):
-    """helper class used to store all necessary data about urls that should be processed"""
-
-    def __init__(self, url, id_to_update=None):
-        self.url = url
-        self.id_to_update = id_to_update
-        self.fetched_dicts = []
-        self.error = False
-
-    def append_fetched_dicts(self, objs):
-        for key in objs.keys():
-            obj = objs[key]
-            # todo think better name for url
-            obj.update({'source_url': self.url})
-            self.fetched_dicts.append(obj)
-
-    # arguments are sys.exc_info() unpacked
-    def handle_error(self, exc_type, exc_value, exc_traceback):
-        # todo check error reporting when disconnected
-        # todo test logging
-        # https://fangpenlin.com/posts/2012/08/26/good-logging-practice-in-python/
-        # https://stackoverflow.com/a/4992124
-        last_tb_line = traceback.format_exc().splitlines()[-1]
-        # exc_info could be set to True, but last tb line printing is enough for now
-        self.log(msg='Url: {}, e_val: {}'.format(self.url, last_tb_line), level=logging.ERROR)
-        # used for id exclusion from success update
-        self.error = True

@@ -1,6 +1,6 @@
 from collections import deque
 from queue import Queue
-from threading import Thread
+from threading import Thread, Lock
 from abc import ABCMeta, abstractmethod
 
 from scraper.utils import LoggingMixin
@@ -20,9 +20,11 @@ class Loader(AbstractLoader):
         super().__init__()
         if config is None:
             config = {}
-        # todo maybe use decriptors for validation is fetcher or saver classes
+        # todo add logging of fetcher and saver instances
         self.saver = saver_cls.get_saver(config.get('saver', {}))
         self.fetcher = fetcher_cls.get_fetcher(config.get('fetcher', {}))
+        # todo think about set_logger as Descriptor
+        # class attribute logger as Descriptor with logger name
         self.set_logger(logger=logger)
         self.saver.set_logger(logger=logger)
         self.fetcher.set_logger(logger=logger)
@@ -60,40 +62,55 @@ class ThreadedLoader(Loader):
     def __init__(self, fetcher_cls, saver_cls, max_req_count=100, concurrent=5, logger=None, config=None):
         super().__init__(fetcher_cls, saver_cls, config=config, max_req_count=max_req_count, logger=logger)
         self.concurrent = concurrent
-        self.q = Queue(maxsize=(self.concurrent * self._concurrent_multiplier))
+        self.fq = Queue(maxsize=(self.concurrent * self._concurrent_multiplier))
+        self.sq = Queue()
 
-    def load(self):
+    def fetch_worker(self):
+        l = Lock()
 
-        def worker():
-            while True:
-                item = self.q.get()
-                # todo make fetch_url method to add fetched url to another queue that will be consumed by single process or thread
-                furl = self.fetcher.fetch(url=item)
-                # todo test error handling
-                if furl.error:
-                    self.error_count += 1
-                else:
-                    # todo add acquire lock here
-                    self.saver.append(fetched_url=furl)
-                # todo add acquire lock here
+        while True:
+            item = self.fq.get()
+            furl = self.fetcher.fetch(url=item)
+            # todo test error handling
+            if furl.error:
+                self.error_count += 1
+            else:
+                self.sq.put(furl)
+
+            with l:
                 self.req_count += 1
-                self.q.task_done()
+            self.fq.task_done()
 
+    def save_worker(self):
+        while True:
+            item = self.sq.get()
+            self.saver.append(fetched_url=item)
+            self.sq.task_done()
+
+    def create_workers(self):
         for i in range(self.concurrent):
-            t = Thread(target=worker)
+            t = Thread(target=self.fetch_worker)
             t.daemon = True
             t.start()
 
+        st = Thread(target=self.save_worker, daemon=True)
+        st.start()
+
+    def load(self):
+
+        self.create_workers()
+
         self.log('Start data loading')
         for url in self.fetcher.get_urls():
-            self.q.put(url)
+            self.fq.put(url)
             # this might be not accurate, cause urls put in queue still be processed even if loop stops,
             #  think how to fix this
             if self.req_count == self.max_req_count:
                 self.log('Hit max request at {}'.format(self.req_count))
                 break
 
-        self.q.join()
+        self.fq.join()
+        self.sq.join()
         # final db update
         self.saver.update_db()
 

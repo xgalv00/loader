@@ -383,12 +383,11 @@ class DataGetterTest(TestCase):
         urls = list(self.tdg.get_urls())
         self.assertEqual(len(urls), 0)
 
-    # todo test get_response and various exceptions
     @mock.patch('requests.get', side_effect=mocked_requests_get)
     def test_get_response(self, mock_get):
-        result = self.tdg.get_response('http://t.com/t')
+        result = Url('http://t.com/t').get_response()
         self.assertTrue(result['success'])
-        self.assertRaises(requests.HTTPError, lambda: self.tdg.get_response('http://t.com/404'))
+        self.assertRaises(requests.HTTPError, lambda: Url('http://t.com/404').get_response())
 
     def test_get_objects_from_url(self):
         self.tdg.key = 'result'
@@ -519,14 +518,14 @@ class PaginatedDataGetterTest(TestCase):
     def test_paginated(self, mock_get):
         paginated = 'https://www.myedu.com/adms/school/paginated'
         self.assertEqual(self.tdg.pages, 1)
-        self.assertTrue(self.tdg.is_paginated(url=paginated))
+        self.assertTrue(self.tdg.is_paginated(url_string=paginated))
         self.assertEqual(self.tdg.pages, 2)
 
     @mock.patch('requests.get', side_effect=mocked_requests_get)
     def test_not_paginated(self, mock_get):
         not_paginated = 'https://www.myedu.com/adms/school/notpaginated'
         self.assertEqual(self.tdg.pages, 1)
-        self.assertFalse(self.tdg.is_paginated(url=not_paginated))
+        self.assertFalse(self.tdg.is_paginated(url_string=not_paginated))
         self.assertEqual(self.tdg.pages, 1)
 
     def test_get_urls(self):

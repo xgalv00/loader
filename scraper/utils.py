@@ -3,6 +3,8 @@ import logging
 import time
 import traceback
 
+import requests
+
 from django.core.paginator import Paginator
 from django.db import transaction
 
@@ -80,6 +82,13 @@ class Url(object):
         self.id_to_update = id_to_update
         self.fetched_dicts = []
         self.error = False
+
+    def get_response(self):
+        response = requests.get(self.url, timeout=10)
+        if response.ok:
+            return response.json()
+        else:
+            response.raise_for_status()
 
     def append_fetched_dicts(self, objs):
         for key in objs.keys():

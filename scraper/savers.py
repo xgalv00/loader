@@ -1,10 +1,27 @@
+from abc import ABCMeta, abstractmethod
+
 from django.db import transaction
 
 from scraper.models import School, Department
 from scraper.utils import LoggingMixin
 
 
-class DataSaver(LoggingMixin):
+class AbstractSaver(LoggingMixin, metaclass=ABCMeta):
+
+    @abstractmethod
+    def update_db(self):
+        pass
+
+    @abstractmethod
+    def append(self, fetched_url):
+        pass
+
+    @classmethod
+    def get_saver(cls, config):
+        return cls(**config)
+
+
+class BaseSaver(AbstractSaver):
 
     def __init__(self, save_count=1, save_class=None):
         super().__init__()
@@ -38,6 +55,7 @@ class DataSaver(LoggingMixin):
         self.success_ids.append(fetched_url.id_to_update)
         self.not_saved_count += 1
         if self.not_saved_count > 0 and self.not_saved_count % self.save_count == 0:
+            count_to_save = len(self.save_list)
             self.update_db()
-            self.log('Save {} of objects, for {} url'.format(len(self.save_list), self.save_count))
+            self.log('Save {} of objects, from {} urls'.format(count_to_save, self.save_count))
             self.not_saved_count = 0

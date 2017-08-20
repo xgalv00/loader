@@ -72,8 +72,7 @@ class ProcessBigAmountsMixin(LoggingMixin):
                 has_next_chunk = False
 
 
-# todo make Url class injectable
-class Url(LoggingMixin):
+class Url(object):
     """helper class used to store all necessary data about urls that should be processed"""
 
     def __init__(self, url, id_to_update=None):
@@ -90,13 +89,14 @@ class Url(LoggingMixin):
             self.fetched_dicts.append(obj)
 
     # arguments are sys.exc_info() unpacked
-    def handle_error(self, exc_type, exc_value, exc_traceback):
+    def handle_error(self, logger, exc_type, exc_value, exc_traceback):
         # todo check error reporting when disconnected
         # todo test logging
         # https://fangpenlin.com/posts/2012/08/26/good-logging-practice-in-python/
         # https://stackoverflow.com/a/4992124
         last_tb_line = traceback.format_exc().splitlines()[-1]
         # exc_info could be set to True, but last tb line printing is enough for now
-        self.log(msg='Url: {}, e_val: {}'.format(self.url, last_tb_line), level=logging.ERROR)
+        if logger is not None:
+            logger.log(msg='Url: {}, e_val: {}'.format(self.url, last_tb_line), level=logging.ERROR)
         # used for id exclusion from success update
         self.error = True

@@ -4,9 +4,9 @@ from django.test import TestCase, mock
 from model_mommy import mommy
 
 from scraper.models import School, Department
-from scraper.datagetters import DataGetter, PaginatedDataGetter
-from scraper.datasavers import DataSaver
-from scraper.executors import Executor, PaginatedExecutor
+from scraper.fetchers import BaseFetcher, PaginatedFetcher
+from scraper.savers import BaseSaver
+from scraper.loaders import Loader
 from scraper.utils import Url
 
 DEPARTMENT_RESPONSE_DICT = {
@@ -356,7 +356,7 @@ class DataGetterTest(TestCase):
         mommy.make(School, school_id=1)
         mommy.make(School, school_id=2)
         mommy.make(School, school_id=3)
-        self.tdg = DataGetter(fetch_class=School)
+        self.tdg = BaseFetcher(fetch_class=School)
 
     def tearDown(self):
         School.objects.all().delete()
@@ -409,7 +409,7 @@ class DataGetterTest(TestCase):
         url = Url(self.tdg.url_template.format(sc_success.school_id), sc_success.id)
         self.assertFalse(url.fetched_dicts)
         self.assertEqual(url.id_to_update, 1)
-        self.tdg.fetch_url(url=url)
+        self.tdg.fetch(url=url)
         # todo add better testing for actual dict values from response
         self.assertEqual(len(url.fetched_dicts), 4)
         self.assertFalse(url.error)
@@ -420,7 +420,7 @@ class DataGetterTest(TestCase):
         url = Url(self.tdg.url_template.format(sc_empty.school_id), sc_empty.id)
         self.assertFalse(url.fetched_dicts)
         self.assertEqual(url.id_to_update, 2)
-        self.tdg.fetch_url(url=url)
+        self.tdg.fetch(url=url)
         self.assertFalse(url.fetched_dicts)
         self.assertFalse(url.error)
 
@@ -430,18 +430,17 @@ class DataGetterTest(TestCase):
         url = Url(self.tdg.url_template.format(sc_error.school_id), sc_error.id)
         self.assertFalse(url.fetched_dicts)
         self.assertEqual(url.id_to_update, 3)
-        self.tdg.fetch_url(url=url)
+        self.tdg.fetch(url=url)
         self.assertFalse(url.fetched_dicts)
         self.assertTrue(url.error)
 
 
 class DataSaverTest(TestCase):
-
     def setUp(self):
         mommy.make(School, school_id=2)
         self.furl = Url('test', id_to_update=2)
         self.furl.append_fetched_dicts(objs=DEPARTMENT_RESPONSE_DICT)
-        self.tsr = DataSaver(save_count=10, save_class=Department)
+        self.tsr = BaseSaver(save_count=10, save_class=Department)
 
     def tearDown(self):
         School.objects.all().delete()
@@ -484,12 +483,12 @@ class DataSaverTest(TestCase):
 
 
 class ExecutorTest(TestCase):
-
     def setUp(self):
         mommy.make(School, school_id=1)
         mommy.make(School, school_id=2)
         mommy.make(School, school_id=3)
-        self.ter = Executor()
+        config = {'fetcher': {'fetch_class': School}, 'saver': {'save_count': 100, 'save_class': Department}}
+        self.ter = Loader(fetcher_cls=BaseFetcher, saver_cls=BaseSaver, config=config)
 
     def tearDown(self):
         School.objects.all().delete()
@@ -500,7 +499,7 @@ class ExecutorTest(TestCase):
     def test_execute(self, mocked_get):
         self.assertFalse(School.objects.filter(department_scraped=True).exists())
         self.assertEqual(Department.objects.count(), 0)
-        self.ter.execute()
+        self.ter.load()
         self.assertEqual(School.objects.filter(department_scraped=False).count(), 1)
         sc_error = School.objects.get(department_scraped=False)
         self.assertEqual(sc_error.school_id, 3)
@@ -510,7 +509,7 @@ class ExecutorTest(TestCase):
 
 class PaginatedDataGetterTest(TestCase):
     def setUp(self):
-        self.tdg = PaginatedDataGetter()
+        self.tdg = PaginatedFetcher()
 
     def tearDown(self):
         School.objects.all().delete()
@@ -540,10 +539,10 @@ class PaginatedDataGetterTest(TestCase):
 
 
 class PaginatedDataExecutorTest(TestCase):
-
     @mock.patch('requests.get', side_effect=mocked_requests_get)
     def test_process_urls(self, mock_get):
         self.assertFalse(School.objects.exists())
-        PaginatedExecutor().execute()
+        config = {'saver': {'save_count': 100, 'save_class': School}}
+        Loader(fetcher_cls=PaginatedFetcher, saver_cls=BaseSaver, config=config).load()
         self.assertTrue(School.objects.exists())
         self.assertEqual(School.objects.count(), 10)

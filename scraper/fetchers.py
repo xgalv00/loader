@@ -1,4 +1,5 @@
 import sys
+from abc import ABCMeta, abstractmethod
 
 import requests
 
@@ -11,15 +12,29 @@ COURSE_PATH = '/department/{department_id}/course/'
 PROFESSOR_PATH = '/department/{department_id}/professor/'
 
 
-class DataGetter(LoggingMixin):
-    url_template = '{api_url}{obj_path}'.format(api_url=API_URL, obj_path=DEPARTMENT_PATH)
+class AbstractUrlFetcher(LoggingMixin, metaclass=ABCMeta):
+    # string to format url for fetch
+    url_template = ''
     # string for traversing json objects
+    key = ''
+    url_class = Url
+
+    @abstractmethod
+    def fetch(self, url):
+        pass
+
+    @classmethod
+    def get_fetcher(cls, config):
+        return cls(**config)
+
+
+class BaseFetcher(AbstractUrlFetcher):
+    url_template = '{api_url}{obj_path}'.format(api_url=API_URL, obj_path=DEPARTMENT_PATH)
     key = 'result.Department'
 
     # class to get_urls from get_values_queryset should be redefined
     # if None than get_urls should know how to get urls for processing
 
-    # max_req_count max number of requests that should be emmited
     def __init__(self, fetch_class=None):
         super().__init__()
         self.fetch_class = fetch_class
@@ -53,9 +68,9 @@ class DataGetter(LoggingMixin):
         values_queryset = self.get_values_queryset()
         for v in values_queryset:
             query_url = self.url_template.format(v)
-            yield Url(query_url, id_to_update=v)
+            yield self.url_class(query_url, id_to_update=v)
 
-    def fetch_url(self, url):
+    def fetch(self, url):
         try:
             # todo move get_response to Url class
             # todo think where to handle exceptions while requests.get
@@ -63,10 +78,10 @@ class DataGetter(LoggingMixin):
             resp_data = self.get_response(url.url)
         # maybe add division by requests exceptions (Timeout, HTTPError, ConnectionError)
         except requests.RequestException as e:
-            url.handle_error(*sys.exc_info())
+            url.handle_error(self._logger, *sys.exc_info())
             objs = {}
         except Exception as e:
-            url.handle_error(*sys.exc_info())
+            url.handle_error(self._logger, *sys.exc_info())
             objs = {}
         else:
             objs = self.get_objects_from_url(resp_data)
@@ -76,7 +91,7 @@ class DataGetter(LoggingMixin):
         return url
 
 
-class PaginatedDataGetter(DataGetter):
+class PaginatedFetcher(BaseFetcher):
     key = 'result.School'
     url_template = '{api_url}{obj_path}'.format(api_url=API_URL, obj_path=SCHOOL_PATH)
 
@@ -101,7 +116,7 @@ class PaginatedDataGetter(DataGetter):
         if self.is_paginated(query_url):
             page = 1
             while page <= self.pages:
-                yield Url('{url}?page={page}'.format(url=query_url, page=page))
+                yield self.url_class('{url}?page={page}'.format(url=query_url, page=page))
                 page += 1
         else:
-            yield Url(query_url)
+            yield self.url_class(query_url)

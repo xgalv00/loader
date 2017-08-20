@@ -2,7 +2,7 @@ import logging
 
 from django.core.management.base import BaseCommand
 
-from scraper.executors import PaginatedExecutor, ThreadedExecutor
+from scraper.loaders import PaginatedLoader, ThreadedLoader
 
 
 class Command(BaseCommand):
@@ -16,5 +16,6 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         logger = logging.getLogger('import')
-        PaginatedExecutor(logger=logger).execute()
-        ThreadedExecutor(logger=logger).execute()
+        # todo create saver for this loader with checking before saving if object is already in db
+        # PaginatedExecutor(logger=logger, max_req_count=2000).execute()
+        ThreadedLoader(logger=logger, max_req_count=20000).execute()

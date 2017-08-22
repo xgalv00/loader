@@ -20,7 +20,6 @@ class Command(BaseCommand):
         logger = logging.getLogger('import')
         # todo create saver for this loader with checking before saving if object is already in db
         # PaginatedExecutor(logger=logger, max_req_count=2000).execute()
-        # todo move this to load method
         common_kwargs = {'config': {'saver': {'save_count': 100}}, 'logger': logger}
         dep_loader = ThreadedLoader(fetcher_cls=DepartmentFetcher, saver_cls=DepartmentSaver, **common_kwargs)
         course_loader = ThreadedLoader(fetcher_cls=CourseFetcher, saver_cls=CourseSaver, **common_kwargs)

@@ -15,16 +15,13 @@ class LoggingMixin(object):
 
     def set_logger(self, logger=None):
         # logger argument should be result of logging.getLogger(name) call
-        # todo add isinstance check
-        if logger:
+        if isinstance(logger, logging.Logger):
             self.logger = logger
         else:
-            # Logger was not provided. Continue without logging
+            # correct logger was not provided. Continue without logging
             self.disable_logging = True
 
     def log(self, msg, level=logging.INFO, exc_info=False):
-        # todo get caller info (class, function, thread or process)
-        # todo use self.stdout.write or print if logger is not available
         if self.logger and not self.disable_logging:
             self.logger.log(level, msg, exc_info=exc_info)
 
@@ -101,10 +98,6 @@ class Url(object):
 
     # arguments are sys.exc_info() unpacked
     def handle_error(self, logger, exc_type, exc_value, exc_traceback):
-        # todo check error reporting when disconnected
-        # todo test logging
-        # https://fangpenlin.com/posts/2012/08/26/good-logging-practice-in-python/
-        # https://stackoverflow.com/a/4992124
         last_tb_line = traceback.format_exc().splitlines()[-1]
         # exc_info could be set to True, but last tb line printing is enough for now
         if logger is not None:

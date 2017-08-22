@@ -26,10 +26,6 @@ class AbstractSaver(LoggingMixin, metaclass=ABCMeta):
         return '{}(save_count={!r})'.format(self.get_class_name(), self.save_count)
 
     def update_db(self):
-        # understand could be a problem here when adding new values to this lists while db queries
-        # try switch to use queue
-        # https://stackoverflow.com/questions/6319207/are-lists-thread-safe
-        # todo add if save_class is None print saved object to log file as info level
         self.work_with_db = True
         with transaction.atomic():
             self.update_fetched_objects()

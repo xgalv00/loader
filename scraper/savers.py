@@ -22,6 +22,9 @@ class AbstractSaver(LoggingMixin, metaclass=ABCMeta):
     def update_fetched_objects(self):
         pass
 
+    def __repr__(self, *args, **kwargs):
+        return '{}(save_count={!r})'.format(self.get_class_name(), self.save_count)
+
     def update_db(self):
         # understand could be a problem here when adding new values to this lists while db queries
         # try switch to use queue

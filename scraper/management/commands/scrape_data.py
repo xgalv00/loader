@@ -25,7 +25,7 @@ class Command(BaseCommand):
         dep_loader = ThreadedLoader(fetcher_cls=DepartmentFetcher, saver_cls=DepartmentSaver, **common_kwargs)
         course_loader = ThreadedLoader(fetcher_cls=CourseFetcher, saver_cls=CourseSaver, **common_kwargs)
         prof_loader = ThreadedLoader(fetcher_cls=ProfessorFetcher, saver_cls=ProfessorSaver, **common_kwargs)
-
-        dep_loader.load(max_req_count=200)
-        course_loader.load(max_req_count=200)
-        prof_loader.load(max_req_count=200)
+        reqs = 50000
+        dep_loader.load(max_req_count=reqs)
+        course_loader.load(max_req_count=reqs)
+        prof_loader.load(max_req_count=reqs)

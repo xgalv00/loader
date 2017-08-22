@@ -20,6 +20,9 @@ class AbstractUrlFetcher(LoggingMixin, metaclass=ABCMeta):
     # if None than get_urls should know how to get urls for processing
     fetch_class = None
 
+    def __repr__(self, *args, **kwargs):
+        return '{}()'.format(self.get_class_name())
+
     def get_objects_from_url(self, data):
         """Uses self.key to traverse json result"""
         for ki in self.key.split('.'):
@@ -46,7 +49,7 @@ class AbstractUrlFetcher(LoggingMixin, metaclass=ABCMeta):
             resp_data = url.get_response()
         # maybe add division by requests exceptions (requests.RequestException, Timeout, HTTPError, ConnectionError)
         except Exception as e:
-            url.handle_error(self._logger, *sys.exc_info())
+            url.handle_error(self.logger, *sys.exc_info())
             objs = {}
         else:
             objs = self.get_objects_from_url(resp_data)
@@ -74,7 +77,7 @@ class PaginatedFetcher(AbstractUrlFetcher):
         try:
             resp_result = url.get_response()
         except Exception as e:
-            url.handle_error(self._logger, *sys.exc_info())
+            url.handle_error(self.logger, *sys.exc_info())
             raise
         try:
             pag_dict = resp_result['pagination']

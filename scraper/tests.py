@@ -370,7 +370,7 @@ class DepartmentFetcherTest(TestCase):
         self.assertEqual(len(urls), School.objects.count())
         for url in urls:
             self.assertIsInstance(url, Url)
-            self.assertEqual(url.url, self.tdg.url_template.format(url.id_to_update))
+            self.assertEqual(url.url_string, self.tdg.url_template.format(url.id_to_update))
             self.assertTrue(School.objects.filter(school_id=url.id_to_update, department_scraped=False).exists())
 
         tsch = School.objects.first()
@@ -534,8 +534,8 @@ class PaginatedFetcherTest(TestCase):
         self.assertEqual(len(urls), self.tdg.pages)
         for url in urls:
             self.assertIsInstance(url, Url)
-            self.assertIn('page', url.url)
-            self.assertRegex(url.url, 'https://www.myedu.com/adms/school/\?page=[\d+]')
+            self.assertIn('page', url.url_string)
+            self.assertRegex(url.url_string, 'https://www.myedu.com/adms/school/\?page=[\d+]')
 
 
 class PaginatedLoaderTest(TestCase):

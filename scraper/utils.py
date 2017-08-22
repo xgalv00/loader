@@ -10,23 +10,26 @@ from django.db import transaction
 
 
 class LoggingMixin(object):
-    _disable_logging = False
-    _logger = None
+    disable_logging = False
+    logger = None
 
     def set_logger(self, logger=None):
         # logger argument should be result of logging.getLogger(name) call
         # todo add isinstance check
         if logger:
-            self._logger = logger
+            self.logger = logger
         else:
             # Logger was not provided. Continue without logging
-            self._disable_logging = True
+            self.disable_logging = True
 
     def log(self, msg, level=logging.INFO, exc_info=False):
         # todo get caller info (class, function, thread or process)
         # todo use self.stdout.write or print if logger is not available
-        if self._logger and not self._disable_logging:
-            self._logger.log(level, msg, exc_info=exc_info)
+        if self.logger and not self.disable_logging:
+            self.logger.log(level, msg, exc_info=exc_info)
+
+    def get_class_name(self):
+        return self.__class__.__name__
 
 
 class ProcessBigAmountsMixin(LoggingMixin):
@@ -78,13 +81,13 @@ class Url(object):
     """helper class used to store all necessary data about urls that should be processed"""
 
     def __init__(self, url, id_to_update=None):
-        self.url = url
+        self.url_string = url
         self.id_to_update = id_to_update
         self.fetched_dicts = []
         self.error = False
 
     def get_response(self):
-        response = requests.get(self.url, timeout=10)
+        response = requests.get(self.url_string, timeout=10)
         if response.ok:
             return response.json()
         else:
@@ -93,8 +96,7 @@ class Url(object):
     def append_fetched_dicts(self, objs):
         for key in objs.keys():
             obj = objs[key]
-            # todo think better name for url
-            obj.update({'source_url': self.url})
+            obj.update({'source_url': self.url_string})
             self.fetched_dicts.append(obj)
 
     # arguments are sys.exc_info() unpacked
@@ -106,6 +108,6 @@ class Url(object):
         last_tb_line = traceback.format_exc().splitlines()[-1]
         # exc_info could be set to True, but last tb line printing is enough for now
         if logger is not None:
-            logger.log(msg='Url: {}, e_val: {}'.format(self.url, last_tb_line), level=logging.ERROR)
+            logger.log(msg='Url: {}, e_val: {}'.format(self.url_string, last_tb_line), level=logging.ERROR)
         # used for id exclusion from success update
         self.error = True

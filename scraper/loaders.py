@@ -16,24 +16,24 @@ class AbstractLoader(LoggingMixin, metaclass=ABCMeta):
 class Loader(AbstractLoader):
 
     # max_req_count max number of requests that should be emmited
-    def __init__(self, fetcher_cls, saver_cls, max_req_count=10, logger=None, config=None):
+    def __init__(self, fetcher_cls, saver_cls, logger=None, config=None):
         super().__init__()
         if config is None:
             config = {}
 
         self.saver = saver_cls.get_saver(config.get('saver', {}))
         self.fetcher = fetcher_cls.get_fetcher(config.get('fetcher', {}))
+        # todo add logging of fetcher and saver instances and loader class
         # todo think about set_logger as Descriptor
         # class attribute logger as Descriptor with logger name
         self.set_logger(logger=logger)
         self.saver.set_logger(logger=logger)
         self.fetcher.set_logger(logger=logger)
-        self.max_req_count = max_req_count
         self.req_count = 0
         self.error_count = 0
 
-    def load(self):
-        # todo add logging of fetcher and saver instances
+    def load(self, max_req_count=10):
+
         self.log('Start data loading')
         for url in self.fetcher.get_urls():
             furl = self.fetcher.fetch(url=url)
@@ -43,7 +43,7 @@ class Loader(AbstractLoader):
                 self.saver.append(fetched_url=furl)
             self.req_count += 1
 
-            if self.req_count == self.max_req_count:
+            if self.req_count == max_req_count:
                 self.log('Hit max request at {}'.format(self.req_count))
                 break
 
@@ -56,13 +56,13 @@ class Loader(AbstractLoader):
 
 class ThreadedLoader(Loader):
     # multiplier for queue size
-    _concurrent_multiplier = 3
+    concurrent_multiplier = 3
 
     # todo maybe move configuration to class method for better arguments
-    def __init__(self, fetcher_cls, saver_cls, max_req_count=100, concurrent=5, logger=None, config=None):
-        super().__init__(fetcher_cls, saver_cls, config=config, max_req_count=max_req_count, logger=logger)
+    def __init__(self, fetcher_cls, saver_cls, concurrent=5, logger=None, config=None):
+        super().__init__(fetcher_cls, saver_cls, config=config, logger=logger)
         self.concurrent = concurrent
-        self.fq = Queue(maxsize=(self.concurrent * self._concurrent_multiplier))
+        self.fq = Queue(maxsize=(self.concurrent * self.concurrent_multiplier))
         self.sq = Queue()
 
     def fetch_worker(self):
@@ -96,23 +96,26 @@ class ThreadedLoader(Loader):
         st = Thread(target=self.save_worker, daemon=True)
         st.start()
 
-    def load(self):
+    def load(self, max_req_count=10):
 
         self.create_workers()
 
         self.log('Start data loading')
+
+        counter = 0
         for url in self.fetcher.get_urls():
             self.fq.put(url)
-            # this might be not accurate, cause urls put in queue still be processed even if loop stops,
-            #  think how to fix this
-            if self.req_count == self.max_req_count:
-                self.log('Hit max request at {}'.format(self.req_count))
+            counter += 1
+            if counter == max_req_count:
                 break
 
         self.fq.join()
         self.sq.join()
         # final db update
         self.saver.update_db()
+
+        if self.req_count == max_req_count:
+            self.log('Hit max request at {}'.format(self.req_count))
 
         self.log('Requests issued {}. Errors {}'.format(self.req_count, self.error_count))
         self.log('Finish data loading')

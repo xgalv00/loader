@@ -20,7 +20,7 @@ class Loader(AbstractLoader):
         super().__init__()
         if config is None:
             config = {}
-        # todo add logging of fetcher and saver instances
+
         self.saver = saver_cls.get_saver(config.get('saver', {}))
         self.fetcher = fetcher_cls.get_fetcher(config.get('fetcher', {}))
         # todo think about set_logger as Descriptor
@@ -33,7 +33,7 @@ class Loader(AbstractLoader):
         self.error_count = 0
 
     def load(self):
-
+        # todo add logging of fetcher and saver instances
         self.log('Start data loading')
         for url in self.fetcher.get_urls():
             furl = self.fetcher.fetch(url=url)

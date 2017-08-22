@@ -2,12 +2,13 @@ import sys
 from abc import ABCMeta, abstractmethod
 
 from scraper.utils import LoggingMixin, Url
+from scraper.models import School, Department
 
 API_URL = 'https://www.myedu.com/adms'
 SCHOOL_PATH = '/school/'
 DEPARTMENT_PATH = '/school/{}/department/'
-COURSE_PATH = '/department/{department_id}/course/'
-PROFESSOR_PATH = '/department/{department_id}/professor/'
+COURSE_PATH = '/department/{}/course/'
+PROFESSOR_PATH = '/department/{}/professor/'
 
 
 class AbstractUrlFetcher(LoggingMixin, metaclass=ABCMeta):
@@ -16,26 +17,8 @@ class AbstractUrlFetcher(LoggingMixin, metaclass=ABCMeta):
     # string for traversing json objects
     key = ''
     url_class = Url
-
-    @abstractmethod
-    def fetch(self, url):
-        pass
-
-    @classmethod
-    def get_fetcher(cls, config):
-        return cls(**config)
-
-
-class BaseFetcher(AbstractUrlFetcher):
-    url_template = '{api_url}{obj_path}'.format(api_url=API_URL, obj_path=DEPARTMENT_PATH)
-    key = 'result.Department'
-
-    # class to get_urls from get_values_queryset should be redefined
     # if None than get_urls should know how to get urls for processing
-
-    def __init__(self, fetch_class=None):
-        super().__init__()
-        self.fetch_class = fetch_class
+    fetch_class = None
 
     def get_objects_from_url(self, data):
         """Uses self.key to traverse json result"""
@@ -52,13 +35,10 @@ class BaseFetcher(AbstractUrlFetcher):
     def get_values_queryset(self):
         if self.fetch_class is None:
             return []
-        return self.fetch_class.objects.filter(department_scraped=False).values_list('school_id', flat=True)
 
+    @abstractmethod
     def get_urls(self):
-        values_queryset = self.get_values_queryset()
-        for v in values_queryset:
-            query_url = self.url_template.format(v)
-            yield self.url_class(query_url, id_to_update=v)
+        return self.get_values_queryset()
 
     def fetch(self, url):
         try:
@@ -75,13 +55,17 @@ class BaseFetcher(AbstractUrlFetcher):
 
         return url
 
+    @classmethod
+    def get_fetcher(cls, config):
+        return cls(**config)
 
-class PaginatedFetcher(BaseFetcher):
+
+class PaginatedFetcher(AbstractUrlFetcher):
     key = 'result.School'
     url_template = '{api_url}{obj_path}'.format(api_url=API_URL, obj_path=SCHOOL_PATH)
 
-    def __init__(self, fetch_class=None):
-        super().__init__(fetch_class)
+    def __init__(self):
+        super().__init__()
         self.pages = 1
 
     def is_paginated(self, url_string):
@@ -109,3 +93,36 @@ class PaginatedFetcher(BaseFetcher):
                 page += 1
         else:
             yield self.url_class(query_url)
+
+
+class DepartmentFetcher(AbstractUrlFetcher):
+    url_template = '{api_url}{obj_path}'.format(api_url=API_URL, obj_path=DEPARTMENT_PATH)
+    key = 'result.Department'
+    fetch_class = School
+
+    def get_values_queryset(self):
+        return self.fetch_class.objects.filter(department_scraped=False).values_list('school_id', flat=True)
+
+    def get_urls(self):
+        values_queryset = self.get_values_queryset()
+        for v in values_queryset:
+            query_url = self.url_template.format(v)
+            yield self.url_class(query_url, id_to_update=v)
+
+
+class CourseFetcher(DepartmentFetcher):
+    url_template = '{api_url}{obj_path}'.format(api_url=API_URL, obj_path=COURSE_PATH)
+    key = 'result.Course'
+    fetch_class = Department
+
+    def get_values_queryset(self):
+        return self.fetch_class.objects.filter(course_scraped=False).values_list('department_id', flat=True)
+
+
+class ProfessorFetcher(DepartmentFetcher):
+    url_template = '{api_url}{obj_path}'.format(api_url=API_URL, obj_path=PROFESSOR_PATH)
+    key = 'result.Professor'
+    fetch_class = Department
+
+    def get_values_queryset(self):
+        return self.fetch_class.objects.filter(professor_scraped=False).values_list('department_id', flat=True)

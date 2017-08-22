@@ -2,44 +2,31 @@ from abc import ABCMeta, abstractmethod
 
 from django.db import transaction
 
-from scraper.models import School, Department
+from scraper.models import School, Department, Course, Professor
 from scraper.utils import LoggingMixin
 
 
 class AbstractSaver(LoggingMixin, metaclass=ABCMeta):
 
-    @abstractmethod
-    def update_db(self):
-        pass
+    save_class = None
 
-    @abstractmethod
-    def append(self, fetched_url):
-        pass
-
-    @classmethod
-    def get_saver(cls, config):
-        return cls(**config)
-
-
-class BaseSaver(AbstractSaver):
-
-    def __init__(self, save_count=1, save_class=None):
+    def __init__(self, save_count=1):
         super().__init__()
-        self.save_class = save_class
         self.save_count = save_count
         self.success_ids = []
         self.save_list = []
         self.work_with_db = False
         self.not_saved_count = 0
 
+    @abstractmethod
     def update_fetched_objects(self):
-        School.objects.filter(school_id__in=self.success_ids).update(department_scraped=True)
+        pass
 
     def update_db(self):
         # understand could be a problem here when adding new values to this lists while db queries
         # try switch to use queue
         # https://stackoverflow.com/questions/6319207/are-lists-thread-safe
-        # todo add if save_class is None print to log file as info level
+        # todo add if save_class is None print saved object to log file as info level
         self.work_with_db = True
         with transaction.atomic():
             self.update_fetched_objects()
@@ -59,3 +46,37 @@ class BaseSaver(AbstractSaver):
             self.update_db()
             self.log('Save {} of objects, from {} urls'.format(count_to_save, self.save_count))
             self.not_saved_count = 0
+
+    @classmethod
+    def get_saver(cls, config):
+        return cls(**config)
+
+
+class SchoolSaver(AbstractSaver):
+    save_class = School
+
+    def update_fetched_objects(self):
+        return []
+
+
+class DepartmentSaver(AbstractSaver):
+    save_class = Department
+
+    def update_fetched_objects(self):
+        return School.objects.filter(school_id__in=self.success_ids).update(department_scraped=True)
+
+
+class CourseSaver(AbstractSaver):
+    save_class = Course
+
+    def update_fetched_objects(self):
+        return Department.objects.filter(department_id__in=self.success_ids).update(course_scraped=True)
+
+
+class ProfessorSaver(AbstractSaver):
+    save_class = Professor
+
+    def update_fetched_objects(self):
+        return Department.objects.filter(department_id__in=self.success_ids).update(professor_scraped=True)
+
+

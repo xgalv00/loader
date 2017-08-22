@@ -4,8 +4,8 @@ from django.test import TestCase, mock
 from model_mommy import mommy
 
 from scraper.models import School, Department
-from scraper.fetchers import BaseFetcher, PaginatedFetcher
-from scraper.savers import BaseSaver
+from scraper.fetchers import DepartmentFetcher, PaginatedFetcher
+from scraper.savers import DepartmentSaver, SchoolSaver
 from scraper.loaders import Loader
 from scraper.utils import Url
 
@@ -351,12 +351,12 @@ def mocked_requests_get(*args, **kwargs):
     return MockResponse(None, 404)
 
 
-class DataGetterTest(TestCase):
+class DepartmentFetcherTest(TestCase):
     def setUp(self):
         mommy.make(School, school_id=1)
         mommy.make(School, school_id=2)
         mommy.make(School, school_id=3)
-        self.tdg = BaseFetcher(fetch_class=School)
+        self.tdg = DepartmentFetcher()
 
     def tearDown(self):
         School.objects.all().delete()
@@ -434,12 +434,12 @@ class DataGetterTest(TestCase):
         self.assertTrue(url.error)
 
 
-class DataSaverTest(TestCase):
+class DepartmentSaverTest(TestCase):
     def setUp(self):
         mommy.make(School, school_id=2)
         self.furl = Url('test', id_to_update=2)
         self.furl.append_fetched_dicts(objs=DEPARTMENT_RESPONSE_DICT)
-        self.tsr = BaseSaver(save_count=10, save_class=Department)
+        self.tsr = DepartmentSaver(save_count=10)
 
     def tearDown(self):
         School.objects.all().delete()
@@ -481,13 +481,13 @@ class DataSaverTest(TestCase):
         self.assertEqual(Department.objects.count(), 4)
 
 
-class ExecutorTest(TestCase):
+class LoaderTest(TestCase):
     def setUp(self):
         mommy.make(School, school_id=1)
         mommy.make(School, school_id=2)
         mommy.make(School, school_id=3)
-        config = {'fetcher': {'fetch_class': School}, 'saver': {'save_count': 100, 'save_class': Department}}
-        self.ter = Loader(fetcher_cls=BaseFetcher, saver_cls=BaseSaver, config=config)
+        config = {'saver': {'save_count': 100}}
+        self.ter = Loader(fetcher_cls=DepartmentFetcher, saver_cls=DepartmentSaver, config=config)
 
     def tearDown(self):
         School.objects.all().delete()
@@ -506,7 +506,7 @@ class ExecutorTest(TestCase):
         self.assertEqual(Department.objects.count(), 4)
 
 
-class PaginatedDataGetterTest(TestCase):
+class PaginatedFetcherTest(TestCase):
     def setUp(self):
         self.tdg = PaginatedFetcher()
 
@@ -528,7 +528,8 @@ class PaginatedDataGetterTest(TestCase):
         self.assertFalse(self.tdg.is_paginated(url_string=not_paginated))
         self.assertEqual(self.tdg.pages, 1)
 
-    def test_get_urls(self):
+    @mock.patch('requests.get', side_effect=mocked_requests_get)
+    def test_get_urls(self, mock_get):
         urls = list(self.tdg.get_urls())
         self.assertEqual(len(urls), self.tdg.pages)
         for url in urls:
@@ -537,11 +538,11 @@ class PaginatedDataGetterTest(TestCase):
             self.assertRegex(url.url, 'https://www.myedu.com/adms/school/\?page=[\d+]')
 
 
-class PaginatedDataExecutorTest(TestCase):
+class PaginatedLoaderTest(TestCase):
     @mock.patch('requests.get', side_effect=mocked_requests_get)
     def test_process_urls(self, mock_get):
         self.assertFalse(School.objects.exists())
-        config = {'saver': {'save_count': 100, 'save_class': School}}
-        Loader(fetcher_cls=PaginatedFetcher, saver_cls=BaseSaver, config=config).load()
+        config = {'saver': {'save_count': 100}}
+        Loader(fetcher_cls=PaginatedFetcher, saver_cls=SchoolSaver, config=config).load()
         self.assertTrue(School.objects.exists())
         self.assertEqual(School.objects.count(), 10)

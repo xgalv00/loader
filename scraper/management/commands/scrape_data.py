@@ -2,7 +2,9 @@ import logging
 
 from django.core.management.base import BaseCommand
 
-from scraper.utils import PaginatedBulkLoader, ThreadedBulkLoader
+from scraper.loaders import ThreadedLoader
+from scraper.fetchers import DepartmentFetcher, CourseFetcher, ProfessorFetcher
+from scraper.savers import DepartmentSaver, CourseSaver, ProfessorSaver
 
 
 class Command(BaseCommand):
@@ -11,10 +13,18 @@ class Command(BaseCommand):
         parser.add_argument(
             '--reqs',
             type=int,
-            help='Set maximum request that should be emitted',
+            help='Set maximum request for each loader that should be emitted',
         )
 
     def handle(self, *args, **options):
         logger = logging.getLogger('import')
-        PaginatedBulkLoader(logger=logger).process_urls()
-        ThreadedBulkLoader(logger=logger).process_urls()
+        # todo create saver for this loader with checking before saving if object is already in db
+        # PaginatedExecutor(logger=logger, max_req_count=2000).execute()
+        common_kwargs = {'config': {'saver': {'save_count': 100}}, 'logger': logger}
+        dep_loader = ThreadedLoader(fetcher_cls=DepartmentFetcher, saver_cls=DepartmentSaver, **common_kwargs)
+        course_loader = ThreadedLoader(fetcher_cls=CourseFetcher, saver_cls=CourseSaver, **common_kwargs)
+        prof_loader = ThreadedLoader(fetcher_cls=ProfessorFetcher, saver_cls=ProfessorSaver, **common_kwargs)
+        reqs = 500
+        dep_loader.load(max_req_count=reqs)
+        course_loader.load(max_req_count=reqs)
+        prof_loader.load(max_req_count=reqs)

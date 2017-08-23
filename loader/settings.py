@@ -129,8 +129,15 @@ LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
+        # 'standard': {
+        #     'format': '%(asctime)s - %(name)s - %(levelname)s - %(funcname)s - %(message)s',
+        # },
+        # todo improve logging configuration
         'standard': {
-            'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            'format': '%(asctime)s - %(name)s - %(levelname)s - %(threadName)s - %(funcName)s - %(message)s',
+        },
+        'threaded': {
+            'format': '%(asctime)s - %(name)s - %(levelname)s - %(threadName)s - %(funcName)s - %(message)s',
         }
     },
     'handlers': {
@@ -139,7 +146,7 @@ LOGGING = {
             'filters': [],
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': LOG_FILE_IMPORT,
-            'maxBytes': 10000,
+            'maxBytes': 1000000,
             'backupCount': 2,
             'formatter': 'standard'
         },
@@ -148,7 +155,7 @@ LOGGING = {
             'filters': [],
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': LOG_FILE_IMPORT_FAILURE,
-            'maxBytes': 10000,
+            'maxBytes': 100000,
             'backupCount': 2,
             'formatter': 'standard'
         }

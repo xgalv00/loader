@@ -1,4 +1,6 @@
-from collections import deque
+import asyncio
+
+from itertools import islice
 from queue import Queue
 from threading import Thread, Lock
 from abc import ABCMeta, abstractmethod
@@ -83,7 +85,8 @@ class ThreadedLoader(Loader):
             item = self.fq.get()
             furl = self.fetcher.fetch(url=item)
             if furl.error:
-                self.error_count += 1
+                with l:
+                    self.error_count += 1
             else:
                 self.sq.put(furl)
 
@@ -113,20 +116,57 @@ class ThreadedLoader(Loader):
         self.log('Start data loading')
         self.log_configuration()
 
-        counter = 0
-        for url in self.fetcher.get_urls():
+        urls = islice(self.fetcher.get_urls(), max_req_count)
+        for url in urls:
             self.fq.put(url)
-            counter += 1
-            if counter == max_req_count:
-                break
 
         self.fq.join()
         self.sq.join()
         # final db update
         self.saver.update_db()
 
-        if self.req_count == max_req_count:
-            self.log('Hit max request at {}'.format(self.req_count))
+        self.log('Requests issued {}. Errors {}'.format(self.req_count, self.error_count))
+        self.log('Finish data loading')
+
+
+class CoroutineLoader(Loader):
+
+    def get_fetched_object(self):
+        while True:
+            url = yield
+            furl = self.fetcher.fetch(url=url)
+            if furl.error:
+                self.error_count += 1
+            else:
+                self.saver.append(fetched_url=furl)
+
+    async def coroutine(self, url):
+        furl = self.fetcher.fetch(url=url)
+        return furl
+
+    def load(self, max_req_count=10):
+
+        self.log('Start data loading')
+        self.log_configuration()
+
+        event_loop = asyncio.get_event_loop()
+        urls = islice(self.fetcher.get_urls(), max_req_count)
+        try:
+            f = asyncio.wait([event_loop.run_in_executor(None, self.fetcher.fetch, url) for url in urls])
+            result = event_loop.run_until_complete(f)
+        finally:
+            event_loop.close()
+        done_tasks = result[0]
+        for dt in done_tasks:
+            furl = dt.result()
+            if furl.error:
+                self.error_count += 1
+            else:
+                self.saver.append(fetched_url=furl)
+            self.req_count += 1
+
+        # final db update
+        self.saver.update_db()
 
         self.log('Requests issued {}. Errors {}'.format(self.req_count, self.error_count))
         self.log('Finish data loading')

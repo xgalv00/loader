@@ -132,8 +132,13 @@ class ThreadedLoader(Loader):
 class AsyncLoader(Loader):
     # todo replace requests.get call with something async
 
-    async def coroutine(self, futures, loop):
-        for f in asyncio.as_completed(futures, loop=loop):
+    def __init__(self, fetcher_cls, saver_cls, connections=10, logger=None, config=None):
+        super().__init__(fetcher_cls, saver_cls, logger, config)
+        self.loop = asyncio.get_event_loop()
+        self.sem = asyncio.Semaphore(connections)
+
+    async def handle_fetched_url(self, futures):
+        for f in asyncio.as_completed(futures, loop=self.loop):
             furl = await f
             if furl.error:
                 self.error_count += 1
@@ -141,15 +146,21 @@ class AsyncLoader(Loader):
                 self.saver.append(fetched_url=furl)
             self.req_count += 1
 
+    async def sem_fetch(self, url):
+        async with self.sem:
+            furl = await self.loop.run_in_executor(None, self.fetcher.fetch, url)
+            return furl
+
     def load(self, max_req_count=10):
 
         self.log('Start data loading')
         self.log_configuration()
-
-        event_loop = asyncio.get_event_loop()
+        futures = []
         urls = islice(self.fetcher.get_urls(), max_req_count)
-        futures = [event_loop.run_in_executor(None, self.fetcher.fetch, url) for url in urls]
-        event_loop.run_until_complete(self.coroutine(futures, event_loop))
+        for url in urls:
+            future = asyncio.ensure_future(self.sem_fetch(url))
+            futures.append(future)
+        self.loop.run_until_complete(self.handle_fetched_url(futures))
 
         # final db update
         self.saver.update_db()

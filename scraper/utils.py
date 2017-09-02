@@ -4,7 +4,6 @@ import time
 import traceback
 
 import requests
-import aiohttp
 
 from django.core.paginator import Paginator
 from django.db import transaction
@@ -105,11 +104,3 @@ class Url(object):
             logger.log(msg='Url: {}, e_val: {}'.format(self.url_string, last_tb_line), level=logging.ERROR)
         # used for id exclusion from success update
         self.error = True
-
-
-class AiohttpUrl(Url):
-
-    async def get_response(self):
-        async with aiohttp.ClientSession() as session:
-            async with session.get(self.url_string, timeout=10) as r:
-                await r.json()

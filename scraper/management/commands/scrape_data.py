@@ -2,7 +2,6 @@ import logging
 
 from django.core.management.base import BaseCommand
 
-from scraper.utils import AiohttpUrl
 from scraper.loaders import ThreadedLoader, AsyncLoader, Loader
 from scraper.fetchers import DepartmentFetcher, CourseFetcher, ProfessorFetcher
 from scraper.savers import DepartmentSaver, CourseSaver, ProfessorSaver
@@ -33,5 +32,5 @@ class Command(BaseCommand):
         # course_loader = ThreadedLoader(fetcher_cls=CourseFetcher, saver_cls=CourseSaver, **common_kwargs)
         # course_loader = Loader(fetcher_cls=CourseFetcher, saver_cls=CourseSaver, **common_kwargs)
         course_loader = AsyncLoader(fetcher_cls=CourseFetcher, saver_cls=CourseSaver, **common_kwargs)
-        reqs = 10
+        reqs = 100
         course_loader.load(max_req_count=reqs)

@@ -129,20 +129,17 @@ class ThreadedLoader(Loader):
         self.log('Finish data loading')
 
 
-class CoroutineLoader(Loader):
+class AsyncLoader(Loader):
+    # todo replace requests.get call with something async
 
-    def get_fetched_object(self):
-        while True:
-            url = yield
-            furl = self.fetcher.fetch(url=url)
+    async def coroutine(self, futures, loop):
+        for f in asyncio.as_completed(futures, loop=loop):
+            furl = await f
             if furl.error:
                 self.error_count += 1
             else:
                 self.saver.append(fetched_url=furl)
-
-    async def coroutine(self, url):
-        furl = self.fetcher.fetch(url=url)
-        return furl
+            self.req_count += 1
 
     def load(self, max_req_count=10):
 
@@ -151,19 +148,8 @@ class CoroutineLoader(Loader):
 
         event_loop = asyncio.get_event_loop()
         urls = islice(self.fetcher.get_urls(), max_req_count)
-        try:
-            f = asyncio.wait([event_loop.run_in_executor(None, self.fetcher.fetch, url) for url in urls])
-            result = event_loop.run_until_complete(f)
-        finally:
-            event_loop.close()
-        done_tasks = result[0]
-        for dt in done_tasks:
-            furl = dt.result()
-            if furl.error:
-                self.error_count += 1
-            else:
-                self.saver.append(fetched_url=furl)
-            self.req_count += 1
+        futures = [event_loop.run_in_executor(None, self.fetcher.fetch, url) for url in urls]
+        event_loop.run_until_complete(self.coroutine(futures, event_loop))
 
         # final db update
         self.saver.update_db()

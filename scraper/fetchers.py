@@ -16,9 +16,12 @@ class AbstractUrlFetcher(LoggingMixin, metaclass=ABCMeta):
     url_template = ''
     # string for traversing json objects
     key = ''
-    url_class = Url
     # if None than get_urls should know how to get urls for processing
     fetch_class = None
+
+    def __init__(self, url_class=Url):
+        super().__init__()
+        self.url_class = url_class
 
     def __repr__(self, *args, **kwargs):
         return '{}()'.format(self.get_class_name())

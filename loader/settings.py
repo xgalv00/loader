@@ -134,7 +134,7 @@ LOGGING = {
         # },
         # todo improve logging configuration
         'standard': {
-            'format': '%(asctime)s - %(name)s - %(levelname)s - %(threadName)s - %(funcName)s - %(message)s',
+            'format': '%(asctime)s - %(name)s - %(levelname)s - %(threadName)s - %(message)s',
         },
         'threaded': {
             'format': '%(asctime)s - %(name)s - %(levelname)s - %(threadName)s - %(funcName)s - %(message)s',

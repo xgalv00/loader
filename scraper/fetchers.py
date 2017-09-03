@@ -1,3 +1,11 @@
+"""
+Classes contain fetch logic
+
+All necessary logic is in AbstractUrlFetcher class
+
+Classes PaginatedFetcher, DepartmentFetcher, CourseFetcher, ProfessorFetcher are derived from this abstract class
+"""
+
 import sys
 from abc import ABCMeta, abstractmethod
 
@@ -12,6 +20,16 @@ PROFESSOR_PATH = '/department/{}/professor/'
 
 
 class AbstractUrlFetcher(LoggingMixin, metaclass=ABCMeta):
+    """
+    Contains all necessary fetch methods
+
+    get_urls method is abstract and should be implemented by child.
+
+    url_template: string to format url for fetch
+    key: string for getting necessary data from response dict
+    fetch_class: model class that have all data for url construction and tracking progress
+    """
+
     # string to format url for fetch
     url_template = ''
     # string for traversing json objects
@@ -27,7 +45,17 @@ class AbstractUrlFetcher(LoggingMixin, metaclass=ABCMeta):
         return '{}()'.format(self.get_class_name())
 
     def get_objects_from_url(self, data):
-        """Uses self.key to traverse json result"""
+        """
+        Looks in response dict for objects that should be saved
+
+        Uses self.key to traverse data.
+        self.key could contain levels separated by dot.
+        If self.key is not found returns empty dict.
+
+        :param data: dict
+        :return: dict
+        """
+
         for ki in self.key.split('.'):
             try:
                 data = data[ki]
@@ -39,14 +67,28 @@ class AbstractUrlFetcher(LoggingMixin, metaclass=ABCMeta):
         return result
 
     def get_values_queryset(self):
+        """
+        Provides variable part of url
+        :return: Iterable
+        """
         if self.fetch_class is None:
             return []
 
     @abstractmethod
     def get_urls(self):
+        """
+        Constructs urls that should be processed
+        :return: Iterable
+        """
         return self.get_values_queryset()
 
     def fetch(self, url):
+        """
+        Makes request to url and saves objects to provided instance of url_class
+
+        :param url: Instance of url_class
+        :return: Instance of url_class
+        """
         try:
             #  maybe define your own exception and raise it from this exceptions
             resp_data = url.get_response()
@@ -63,10 +105,17 @@ class AbstractUrlFetcher(LoggingMixin, metaclass=ABCMeta):
 
     @classmethod
     def get_fetcher(cls, config):
+        """
+        Factory for fetcher construction
+        :param config: dict
+        :return: fetcher instance initialized from this config
+        """
         return cls(**config)
 
 
 class PaginatedFetcher(AbstractUrlFetcher):
+    """Handle urls with pagination"""
+
     key = 'result.School'
     url_template = '{api_url}{obj_path}'.format(api_url=API_URL, obj_path=SCHOOL_PATH)
 
@@ -75,6 +124,13 @@ class PaginatedFetcher(AbstractUrlFetcher):
         self.pages = 1
 
     def is_paginated(self, url_string):
+        """
+        Makes preflight requests to provided url and checks if paginated query differs from regular.
+
+        :param url_string: str
+        :return: bool
+        """
+
         paged_url = '{url}{query}'.format(url=url_string, query='?page=1')
         url = self.url_class(url=paged_url)
         try:

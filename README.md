@@ -1,3 +1,17 @@
+# Simple scraper 
+
+Goal is to explore new ways of concurrent loading
+
+Try to create simple decoupled scraper, that actually loading process could be easily changed.
+And fetching is isolated from saving.
+
+
+
+## TODO
+
+- Replace blocking call to requests.get method with the smallest change to the api possible. (possible variants - grequests, aiohttp, requests-futures)
+- Use concurrent.futures instead of asyncio loader
+
 ## Install notes
 
 - git clone git@github.com:xgalv00/loader.git

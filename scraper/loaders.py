@@ -16,6 +16,11 @@ class AbstractLoader(LoggingMixin, metaclass=ABCMeta):
 
 
 class Loader(AbstractLoader):
+    """
+    Contains all necessary load methods
+
+    load method is simple implementation of non concurrent loading.
+    """
 
     def __init__(self, fetcher_cls, saver_cls, logger=None, config=None):
         super().__init__()
@@ -33,19 +38,29 @@ class Loader(AbstractLoader):
         return '{}(fetcher_cls={}, saver_cls={})'.format(self.get_class_name(), self.fetcher.get_class_name(), self.saver.get_class_name())
 
     def configure_logging(self, logger):
-        # todo think about set_logger as Descriptor
-        # class attribute logger as Descriptor with logger name
+        """
+        Propagates given logger to saver and fetcher
+
+        :param logger: logger instance
+        """
         self.set_logger(logger=logger)
         self.saver.set_logger(logger=logger)
         self.fetcher.set_logger(logger=logger)
 
     def log_configuration(self):
+        """
+        Dumps loader configuration
+        """
         self.log('Loader: {}'.format(self))
         self.log('Fetcher: {}'.format(self.fetcher))
         self.log('Saver: {}'.format(self.saver))
 
-    # max_req_count max number of requests that should be emmited
     def load(self, max_req_count=10):
+        """
+        Fetches objects from urls provided by fetcher class
+        Saves fetched objects using saver class
+        :param max_req_count: int number of requests that should be emmited
+        """
 
         self.log('Start data loading')
         self.log_configuration()
@@ -69,6 +84,9 @@ class Loader(AbstractLoader):
 
 
 class ThreadedLoader(Loader):
+    """
+    Processes urls using threading module
+    """
     # multiplier for queue size
     concurrent_multiplier = 3
 
@@ -79,6 +97,9 @@ class ThreadedLoader(Loader):
         self.sq = Queue()
 
     def fetch_worker(self):
+        """
+        Fetches objects from urls provided by fetcher class and puts them to save queue
+        """
         l = Lock()
 
         while True:
@@ -95,12 +116,18 @@ class ThreadedLoader(Loader):
             self.fq.task_done()
 
     def save_worker(self):
+        """
+        Saves fetched objects using saver class
+        """
         while True:
             item = self.sq.get()
             self.saver.append(fetched_url=item)
             self.sq.task_done()
 
     def create_workers(self):
+        """
+        Creates necessary workers
+        """
         for i in range(self.concurrent):
             t = Thread(target=self.fetch_worker)
             t.daemon = True
@@ -110,6 +137,10 @@ class ThreadedLoader(Loader):
         st.start()
 
     def load(self, max_req_count=10):
+        """
+        Creates workers and orchestrates their work
+        :param max_req_count: int number of requests that should be emmited
+        """
 
         self.create_workers()
 
@@ -130,6 +161,10 @@ class ThreadedLoader(Loader):
 
 
 class AsyncLoader(Loader):
+    """
+    Processes urls using asyncio module
+    """
+
     # todo replace requests.get call with something async
 
     def __init__(self, fetcher_cls, saver_cls, connections=10, logger=None, config=None):
@@ -138,6 +173,12 @@ class AsyncLoader(Loader):
         self.sem = asyncio.Semaphore(connections)
 
     async def handle_fetched_url(self, futures):
+        """
+        Propagates fetched url object to saver
+
+        :param futures: futures with urls to fetch through semaphore
+        """
+
         for f in asyncio.as_completed(futures, loop=self.loop):
             furl = await f
             if furl.error:
@@ -147,12 +188,21 @@ class AsyncLoader(Loader):
             self.req_count += 1
 
     async def sem_fetch(self, url):
+        """
+        Fetch urls using Semaphore
+
+        :param url: url instance
+        :return: url instance with fetched_dicts populated
+        """
         async with self.sem:
             furl = await self.loop.run_in_executor(None, self.fetcher.fetch, url)
             return furl
 
     def load(self, max_req_count=10):
-
+        """
+        Orchestrates loading process
+        :param max_req_count: int number of requests that should be emmited
+        """
         self.log('Start data loading')
         self.log_configuration()
         futures = []

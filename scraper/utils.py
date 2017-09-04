@@ -5,6 +5,7 @@ Utility classes
 import logging
 import traceback
 
+import aiohttp
 import requests
 
 
@@ -81,3 +82,14 @@ class Url(object):
             logger.log(msg='Url: {}, e_val: {}'.format(self.url_string, last_tb_line), level=logging.ERROR)
         # used for id exclusion from success update
         self.error = True
+
+
+class AsyncUrl(Url):
+    """
+    Requests url_string in asynchronous way
+    """
+
+    async def get_response(self):
+        async with aiohttp.ClientSession(raise_for_status=True) as session:
+            async with session.get(self.url_string, timeout=10) as resp:
+                return await resp.json()

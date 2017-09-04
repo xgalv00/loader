@@ -487,7 +487,8 @@ class LoaderTest(TestCase):
         mommy.make(School, school_id=2)
         mommy.make(School, school_id=3)
         config = {'saver': {'save_count': 100}}
-        self.ter = Loader(fetcher_cls=DepartmentFetcher, saver_cls=DepartmentSaver, config=config)
+
+        self.ter = Loader(fetcher=DepartmentFetcher(), saver=DepartmentSaver())
 
     def tearDown(self):
         School.objects.all().delete()
@@ -542,7 +543,6 @@ class PaginatedLoaderTest(TestCase):
     @mock.patch('requests.get', side_effect=mocked_requests_get)
     def test_process_urls(self, mock_get):
         self.assertFalse(School.objects.exists())
-        config = {'saver': {'save_count': 100}}
-        Loader(fetcher_cls=PaginatedFetcher, saver_cls=SchoolSaver, config=config).load()
+        Loader(fetcher=PaginatedFetcher(), saver=SchoolSaver()).load()
         self.assertTrue(School.objects.exists())
         self.assertEqual(School.objects.count(), 10)

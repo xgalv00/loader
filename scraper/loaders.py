@@ -22,20 +22,17 @@ class Loader(AbstractLoader):
     load method is simple implementation of non concurrent loading.
     """
 
-    def __init__(self, fetcher_cls, saver_cls, logger=None, config=None):
+    def __init__(self, fetcher, saver, logger=None):
         super().__init__()
 
-        if config is None:
-            config = {}
-
-        self.saver = saver_cls.get_saver(config.get('saver', {}))
-        self.fetcher = fetcher_cls.get_fetcher(config.get('fetcher', {}))
+        self.saver = saver
+        self.fetcher = fetcher
         self.configure_logging(logger)
         self.req_count = 0
         self.error_count = 0
 
     def __repr__(self, *args, **kwargs):
-        return '{}(fetcher_cls={}, saver_cls={})'.format(self.get_class_name(), self.fetcher.get_class_name(), self.saver.get_class_name())
+        return '{}(fetcher={}(), saver={}())'.format(self.get_class_name(), self.fetcher.get_class_name(), self.saver.get_class_name())
 
     def configure_logging(self, logger):
         """
@@ -90,8 +87,8 @@ class ThreadedLoader(Loader):
     # multiplier for queue size
     concurrent_multiplier = 3
 
-    def __init__(self, fetcher_cls, saver_cls, concurrent=5, logger=None, config=None):
-        super().__init__(fetcher_cls, saver_cls, config=config, logger=logger)
+    def __init__(self, fetcher, saver, concurrent=5, logger=None):
+        super().__init__(fetcher, saver, logger=logger)
         self.concurrent = concurrent
         self.fq = Queue(maxsize=(self.concurrent * self.concurrent_multiplier))
         self.sq = Queue()
@@ -165,10 +162,8 @@ class AsyncLoader(Loader):
     Processes urls using asyncio module
     """
 
-    # todo replace requests.get call with something async
-
-    def __init__(self, fetcher_cls, saver_cls, connections=10, logger=None, config=None):
-        super().__init__(fetcher_cls, saver_cls, logger, config)
+    def __init__(self, fetcher, saver, connections=100, logger=None):
+        super().__init__(fetcher, saver, logger=logger)
         self.loop = asyncio.get_event_loop()
         self.sem = asyncio.Semaphore(connections)
 
@@ -195,7 +190,7 @@ class AsyncLoader(Loader):
         :return: url instance with fetched_dicts populated
         """
         async with self.sem:
-            furl = await self.loop.run_in_executor(None, self.fetcher.fetch, url)
+            furl = await self.fetcher.async_fetch(url)
             return furl
 
     def load(self, max_req_count=10):

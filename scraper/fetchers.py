@@ -42,7 +42,7 @@ class AbstractUrlFetcher(LoggingMixin, metaclass=ABCMeta):
         self.url_class = url_class
 
     def __repr__(self, *args, **kwargs):
-        return '{}()'.format(self.get_class_name())
+        return '{}(url_class={})'.format(self.get_class_name(), self.url_class.__name__)
 
     def get_objects_from_url(self, data):
         """
@@ -81,6 +81,25 @@ class AbstractUrlFetcher(LoggingMixin, metaclass=ABCMeta):
         :return: Iterable
         """
         return self.get_values_queryset()
+
+    async def async_fetch(self, url):
+        """
+        Makes asynchronous request to url and saves objects to provided instance of url_class
+
+        :param url: Instance of url_class
+        :return: Instance of url_class
+        """
+        try:
+            resp_data = await url.get_response()
+        except Exception as e:
+            url.handle_error(self.logger, *sys.exc_info())
+            objs = {}
+        else:
+            objs = self.get_objects_from_url(resp_data)
+
+        url.append_fetched_dicts(objs=objs)
+
+        return url
 
     def fetch(self, url):
         """
